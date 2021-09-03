@@ -7,7 +7,7 @@
 </div>
 
 
-* Exit Spotify first 
+* Close Spotify first 
 * Run The following command
 ```
 python adRemover.py
