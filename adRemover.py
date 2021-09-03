@@ -13,7 +13,7 @@ class adRemover:
         self.lockRunas = Lock() 
         self.log = log
         self.debuggerPort = "9229"
-        self.remover_main = "setInterval(function(){Ads.clearSlot('stream');Ads.clearSlot('hpto');Ads.clearSlot('leaderboard');for(var e=document.querySelectorAll('iframe'),o=0;o<e.length;o++)console.log('RM'),e[o].parentNode.removeChild(e[o])},1);var originalFetch=window.fetch;window.fetch=function(e,o){return console.log('fetch: '+e),null==e||e.includes('spotify.com')?originalFetch.call(window,e,o):(console.log('RM2'),!1)};"
+        self.remover_main = "setInterval(function(){Ads.clearSlot('video');Ads.clearSlot('banner');Ads.clearSlot('audio');Ads.clearSlot('stream');Ads.clearSlot('hpto');Ads.clearSlot('leaderboard');for(var e=document.querySelectorAll('iframe'),o=0;o<e.length;o++)console.log('RM'),e[o].parentNode.removeChild(e[o])},1);var originalFetch=window.fetch;window.fetch=function(e,o){return console.log('fetch: '+e),null==e||e.includes('spotify.com')?originalFetch.call(window,e,o):(console.log('RM2'),!1)};"
         self.remover_service = "var originalFetch=fetch;fetch=function(e,o){return console.log(e.url, e),originalFetch(e,o)}"
         self.spotify = os.getenv('APPDATA') + r'\Spotify\Spotify.exe'
         self.cachePath = [
