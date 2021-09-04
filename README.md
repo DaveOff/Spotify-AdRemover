@@ -7,8 +7,8 @@
 </div>
 
 
-* Close Spotify first 
-* Run The following command
-```
-python adRemover.py
-```
+#### Hook Method (Default)
+* Attach to spotify process and hook into a native function
+#### Inject Method
+* Inject javascript into spotify. Override fetch and remove all iframes
+
