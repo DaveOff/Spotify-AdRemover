@@ -12,10 +12,13 @@ class adRemover:
     def __init__(self, log=False):
         self.lockRunas = Lock() 
         self.log = log
-        self.debuggerPort = "9229"
-        self.remover_main = "setInterval(function(){Ads.clearSlot('video');Ads.clearSlot('banner');Ads.clearSlot('audio');Ads.clearSlot('stream');Ads.clearSlot('hpto');Ads.clearSlot('leaderboard');for(var e=document.querySelectorAll('iframe'),o=0;o<e.length;o++)console.log('RM'),e[o].parentNode.removeChild(e[o])},1);var originalFetch=window.fetch;window.fetch=function(e,o){return console.log('fetch: '+e),null==e||e.includes('spotify.com')?originalFetch.call(window,e,o):(console.log('RM2'),!1)};"
-        self.remover_service = "var originalFetch=fetch;fetch=function(e,o){return console.log(e.url, e),originalFetch(e,o)}"
         self.spotify = os.getenv('APPDATA') + r'\Spotify\Spotify.exe'
+        """
+            ----- Inject Method -----
+        """
+        self.debuggerPort = "9229"
+        self.remover_main = "setInterval(function(){try{Ads.clearSlot('video'),Ads.clearSlot('banner'),Ads.clearSlot('audio'),Ads.clearSlot('stream'),Ads.clearSlot('hpto'),Ads.clearSlot('leaderboard')}catch(e){}},1000),setInterval(function(){for(var e=document.querySelectorAll('iframe'),o=0;o<e.length;o++)console.log('RM'),e[o].parentNode.removeChild(e[o])},1);var originalFetch=window.fetch;window.fetch=function(e,o){return console.log('fetch: '+e),null==e||e.includes('spotify.com')?originalFetch.call(window,e,o):(console.log('RM2'),!1)};"
+        self.remover_service = "var originalFetch=fetch;fetch=function(e,o){return console.log(e.url, e),originalFetch(e,o)}"
         self.cachePath = [
             os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\16562dee83627072da713c30e2a0f24c77dcb93d\Network Persistent State',
             os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\Network Persistent State',
@@ -25,6 +28,9 @@ class adRemover:
             os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\IndexedDB',
             os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\Service Worker\CacheStorage'
         ]
+        """
+            ----- Inject Method -----
+        """
 		
     def request(self, uri):
         response = requests.get(uri)
@@ -49,9 +55,42 @@ class adRemover:
                     self.mLog("[CH] Folder: " + path)
 
     def onMessage(self, message, data):
-       self.mLog(message["payload"])
+       self.mLog(message{"payload"})
 
-    def run(self):
+    def method_hook(self):
+        proc = subprocess.Popen([self.spotify])
+        sleep(1)
+        session = frida.attach(proc.pid)
+        script = session.create_script("""
+            const blackList = [
+                "https://spclient.wg.spotify.com/ad-logic/",
+                "https://spclient.wg.spotify.com/ads/",
+                "https://spclient.wg.spotify.com/gabo-receiver-service/"
+            ];
+            var hookCreateUrl = Module.findExportByName("libcef.dll", 'cef_string_utf8_to_utf16');
+            Interceptor.attach(hookCreateUrl, {
+                onEnter: function (args) {
+                    var url = ptr(args[0]).readCString(-1);
+                    if(blackList.some(v => url.includes(v))){
+                        this.find = true;
+                        this.ptr = args[2];
+                        this.url = url;
+                    }
+                },
+                onLeave: function (args) {
+                    var mys = Memory.allocUtf16String("http://fku.com");
+                   if(this.find){
+                        send("[HM]" + this.url);
+                        ptr(this.ptr).readPointer().writePointer(mys);
+                   }
+                }
+            });
+            """)
+        script.on('message', self.onMessage)
+        script.load()
+        self.WaitForRunAs()
+
+    def method_inject(self):
         _thread.start_new_thread(self.clearCache, ())
         try:
             if Path(os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\Cookies').is_file():
@@ -61,53 +100,9 @@ class adRemover:
         except Timeout:
             self.mLog("[Run] Timeout")
         sleep(2)
-        proc = subprocess.Popen([self.spotify, '--remote-debugging-port='+self.debuggerPort])
-        sleep(3)
+        subprocess.Popen([self.spotify, '--remote-debugging-port='+self.debuggerPort])
+        sleep(2)
         self.ws()
-        session = frida.attach(proc.pid)
-        script = session.create_script("""
-            const blackList = [
-                "google",
-                "doubleclick",
-                "gstatic",
-                "adeventtracker",
-                "api-partner",
-                "sentry",
-                "mosaic",
-                "scdn",
-                "quicksilver",
-                "adsafeprotected",
-                "rubiconproject.com",
-                "cloudfront.net",
-                "https://spclient.wg.spotify.com/ad-logic/",
-                "https://spclient.wg.spotify.com/ads/",
-                "https://spclient.wg.spotify.com/gabo-receiver-service/"
-            ];
-            var hookParseUrl = Module.findExportByName("libcef.dll", 'cef_parse_url');
-            var hookCreateUrl = Module.findExportByName("libcef.dll", 'cef_urlrequest_create');
-            Interceptor.attach(hookParseUrl, {
-                onEnter: function (args) {
-                    var mptr = ptr(args[0]).readPointer().readUtf16String(-1);
-                    if(!mptr.includes("spotify.com") || blackList.some(v => mptr.includes(v))){
-                        this.find = true;
-                        this.lstg = args[0].readPointer().readUtf16String(-1);
-                        this.ptr = args[0];
-                    } else {
-                        this.find = false;
-                        send("[HK] Load: " + mptr);
-                    }
-                },
-                onLeave: function (args) {
-                    if(this.find == true){
-                        this.ptr.readPointer().writeUtf16String('https://fku.com');
-                        args.replace(0x0);
-                        send("[HK] Remove: " + this.lstg);
-                    } 
-                }
-            });
-            """)
-        script.on('message', self.onMessage)
-        script.load()
         self.WaitForRunAs()
 
     def ws(self):
@@ -138,6 +133,6 @@ class adRemover:
 
 if __name__ == "__main__":
     try :
-        adRemover(log=True).run()
+        adRemover(log=False).method_hook()
     except Exception as err:
         print("[Error]{}".format(err))
