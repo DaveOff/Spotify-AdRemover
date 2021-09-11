@@ -3,7 +3,7 @@ from time import sleep
 import psutil
 from threading import Lock, Thread
 import _thread
-import subprocess,os
+import subprocess, os, sys
 from pathlib import Path
 import shutil,requests,json, websocket
 from filelock import Timeout, FileLock
@@ -12,25 +12,32 @@ class adRemover:
     def __init__(self, log=False):
         self.lockRunas = Lock() 
         self.log = log
-        self.spotify = os.getenv('APPDATA') + r'\Spotify\Spotify.exe'
-        """
-            ----- Inject Method -----
-        """
-        self.debuggerPort = "9229"
-        self.remover_main = "setInterval(function(){try{Ads.clearSlot('video'),Ads.clearSlot('banner'),Ads.clearSlot('audio'),Ads.clearSlot('stream'),Ads.clearSlot('hpto'),Ads.clearSlot('leaderboard')}catch(e){}},1000),setInterval(function(){for(var e=document.querySelectorAll('iframe'),o=0;o<e.length;o++)console.log('RM'),e[o].parentNode.removeChild(e[o])},1);var originalFetch=window.fetch;window.fetch=function(e,o){return console.log('fetch: '+e),null==e||e.includes('spotify.com')?originalFetch.call(window,e,o):(console.log('RM2'),!1)};"
-        self.remover_service = "var originalFetch=fetch;fetch=function(e,o){return console.log(e.url, e),originalFetch(e,o)}"
-        self.cachePath = [
-            os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\16562dee83627072da713c30e2a0f24c77dcb93d\Network Persistent State',
-            os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\Network Persistent State',
-            os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\Code Cache',
-            os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\16562dee83627072da713c30e2a0f24c77dcb93d\Code Cache',
-            os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\Session Storage',
-            os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\IndexedDB',
-            os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\Service Worker\CacheStorage'
-        ]
-        """
-            ----- Inject Method -----
-        """
+        if sys.platform == "darwin":
+            self.spotify = r'open /Applications/Spotify.app'
+            self.pName = 'Spotify'
+            self.moduleName = '"Chromium Embedded Framework"'
+        else:
+            self.spotify = os.getenv('APPDATA') + r'\Spotify\Spotify.exe'
+            self.pName = 'Spotify.exe'
+            self.moduleName = '"libcef.dll"'
+            """
+                ----- Inject Method -----
+            """
+            self.debuggerPort = "9229"
+            self.remover_main = "setInterval(function(){try{Ads.clearSlot('video'),Ads.clearSlot('banner'),Ads.clearSlot('audio'),Ads.clearSlot('stream'),Ads.clearSlot('hpto'),Ads.clearSlot('leaderboard')}catch(e){}},1000),setInterval(function(){for(var e=document.querySelectorAll('iframe'),o=0;o<e.length;o++)console.log('RM'),e[o].parentNode.removeChild(e[o])},1);var originalFetch=window.fetch;window.fetch=function(e,o){return console.log('fetch: '+e),null==e||e.includes('spotify.com')?originalFetch.call(window,e,o):(console.log('RM2'),!1)};"
+            self.remover_service = "var originalFetch=fetch;fetch=function(e,o){return console.log(e.url, e),originalFetch(e,o)}"
+            self.cachePath = [
+                os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\16562dee83627072da713c30e2a0f24c77dcb93d\Network Persistent State',
+                os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\Network Persistent State',
+                os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\Code Cache',
+                os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\16562dee83627072da713c30e2a0f24c77dcb93d\Code Cache',
+                os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\Session Storage',
+                os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\IndexedDB',
+                os.getenv('LOCALAPPDATA') + r'\Spotify\Browser\Service Worker\CacheStorage'
+            ]
+            """
+                ----- Inject Method -----
+            """
 		
     def request(self, uri):
         response = requests.get(uri)
@@ -55,19 +62,19 @@ class adRemover:
                     self.mLog("[CH] Folder: " + path)
 
     def onMessage(self, message, data):
-       self.mLog(message{"payload"})
+       self.mLog(message["payload"])
 
     def method_hook(self):
-        proc = subprocess.Popen([self.spotify])
-        sleep(1)
-        session = frida.attach(proc.pid)
+        proc = subprocess.Popen(self.spotify, shell=True)
+        sleep(2)
+        session = frida.attach(proc.pid+1)
         script = session.create_script("""
             const blackList = [
                 "https://spclient.wg.spotify.com/ad-logic/",
                 "https://spclient.wg.spotify.com/ads/",
                 "https://spclient.wg.spotify.com/gabo-receiver-service/"
             ];
-            var hookCreateUrl = Module.findExportByName("libcef.dll", 'cef_string_utf8_to_utf16');
+            var hookCreateUrl = Module.findExportByName(""" + self.moduleName + """, 'cef_string_utf8_to_utf16');
             Interceptor.attach(hookCreateUrl, {
                 onEnter: function (args) {
                     var url = ptr(args[0]).readCString(-1);
@@ -119,11 +126,11 @@ class adRemover:
 
     def WaitForRunAs(self):
         while True:
-            if ("Spotify.exe" in (p.name() for p in psutil.process_iter())) and not self.lockRunas.locked():
+            if (self.pName in (p.name() for p in psutil.process_iter())) and not self.lockRunas.locked():
                 self.lockRunas.acquire()
                 print("[+] Found SP")
                 sleep(0.5)
-            elif (not "Spotify.exe" in (p.name() for p in psutil.process_iter())) and self.lockRunas.locked():
+            elif (not self.pName in (p.name() for p in psutil.process_iter())) and self.lockRunas.locked():
                 self.lockRunas.release()
                 print("[+] SP is dead releasing lock")
                 break
