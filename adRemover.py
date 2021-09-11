@@ -67,7 +67,7 @@ class adRemover:
     def method_hook(self):
         proc = subprocess.Popen(self.spotify, shell=True)
         sleep(2)
-        session = frida.attach(proc.pid+1)
+        session = frida.attach(proc.pid+1 if sys.platform == "darwin" else proc.pid)
         script = session.create_script("""
             const blackList = [
                 "https://spclient.wg.spotify.com/ad-logic/",
@@ -140,6 +140,6 @@ class adRemover:
 
 if __name__ == "__main__":
     try :
-        adRemover(log=False).method_hook()
+        adRemover(log=True).method_hook()
     except Exception as err:
         print("[Error]{}".format(err))
