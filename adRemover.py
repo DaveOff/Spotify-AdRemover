@@ -65,7 +65,7 @@ class adRemover:
        self.mLog(message["payload"])
 
     def method_hook(self):
-        proc = subprocess.Popen(self.spotify, shell=True)
+        proc = subprocess.Popen(self.spotify, shell=True if sys.platform == "darwin" else False)
         sleep(2)
         session = frida.attach(proc.pid+1 if sys.platform == "darwin" else proc.pid)
         script = session.create_script("""
